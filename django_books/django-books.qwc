@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<QBWCXML>
+<AppName>Django-Books</AppName>
+<AppID></AppID>
+<AppURL>http://localhost:8000/webconnector/</AppURL>
+<AppDescription>Django QuickBooks WebConnector</AppDescription>
+<AppSupport>http://localhost:8000/support/</AppSupport>
+<UserName>511829ea-f359-43cb-a885-844ebd8aabb1</UserName>
+<OwnerID>{63293baf-fc64-4747-afa4-3fb5861c9f48}</OwnerID>
+<FileID>{5d7eef11-6f07-4bc6-9c01-b911a6597f96}</FileID>
+<QBType>QBFS</QBType>
+<Scheduler><RunEveryNMinutes>60</RunEveryNMinutes></Scheduler>
+</QBWCXML>

@@ -1,3 +1,5 @@
 from django.contrib import admin
+from django_books.models import ServiceAccount, TicketQueue
 
-# Register your models here.
+admin.site.register(ServiceAccount)
+admin.site.register(TicketQueue)

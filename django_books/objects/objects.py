@@ -1,0 +1,203 @@
+from datetime import datetime
+from lxml import etree
+
+def query_account(): 
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <AccountQueryRq requestID="1">
+                </AccountQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+def query_customer(): 
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <CustomerQueryRq requestID="1">
+                </CustomerQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+def query_vendor(): 
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <VendorQueryRq requestID="1">
+                </VendorQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+def query_journal(): 
+    # failed
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <JournalQueryRq requestID="1">
+                </JournalQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+def query_bill(): 
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <BillQueryRq requestID="1">
+                </BillQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+def query_custom_txn(): 
+    # https://github.com/IntuitDeveloper/QBXML_SDK_Samples/blob/64bitUpgrade/xmlfiles/legacy/CustomDetailReport.xml
+    # does not get parsed all the way 
+    reqXML = """
+       <?qbxml version="2.0"?>
+        <QBXML>
+        <!-- onError may be set to continueOnError or stopOnError-->
+        <QBXMLMsgsRq onError="continueOnError">
+            <CustomDetailReportQueryRq requestID = "UUIDTYPE">
+            <CustomDetailReportType>CustomTxnDetail</CustomDetailReportType>
+            <ReportDateMacro>ThisMonth</ReportDateMacro>
+            <ReportAccountFilter>
+                <AccountTypeFilter>AccountsReceivable</AccountTypeFilter>
+            </ReportAccountFilter>
+            <SummarizeRowsBy>Account</SummarizeRowsBy>
+            <IncludeColumn>TxnNumber</IncludeColumn> 
+            <IncludeColumn>TxnType</IncludeColumn> 
+            <IncludeColumn>Amount</IncludeColumn> 
+            </CustomDetailReportQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+
+def query_class(): 
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <ClassQueryRq requestID="1">
+                </ClassQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+
+def add_customer(name='bill'):
+    if name is None:
+        raise ValueError('Name is a required field')
+    name = name + datetime.now().strftime('%H%s')
+    reqXML = """
+        <?qbxml version="15.0"?>
+        <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <CustomerAddRq>
+                    <CustomerAdd><Name>{}</Name></CustomerAdd>
+                </CustomerAddRq> 
+            </QBXMLMsgsRq>
+        </QBXML>
+        """.format(name)
+    return reqXML
+
+
+def add_credit_card_payment(credit_card='CalOil Card',
+    vendor='ODI',
+    date='2022-01-01',
+    ref_number='3123',
+    memo='MEMO',
+    expense_account='', 
+    amount=102.12, 
+    expense_description=''):
+        
+    reqXML = """
+    <?qbxml version="15.0"?>
+    <QBXML>
+    <QBXMLMsgsRq onError="stopOnError">
+        <CreditCardChargeAddRq>
+            <CreditCardChargeAdd> <!-- required -->
+            <AccountRef> <!-- required -->                                        
+                <FullName>{credit_card}</FullName> <!-- optional -->
+            </AccountRef>
+
+            <PayeeEntityRef> <!-- optional -->
+                <FullName >{vendor}</FullName> <!-- optional -->
+            </PayeeEntityRef>
+            
+            <TxnDate >{date}</TxnDate> <!-- optional -->
+            <RefNumber >{ref_number}</RefNumber> <!-- optional -->
+            <Memo >{memo}</Memo> <!-- optional -->
+            
+            <ExpenseLineAdd> <!-- optional, may repeat -->
+                <AccountRef> <!-- optional -->
+                    <FullName >{expense_account}</FullName> <!-- optional -->
+                </AccountRef>
+                <Amount >{amount}</Amount> <!-- optional -->
+                <Memo >{expense_description}</Memo> <!-- optional -->
+            </ExpenseLineAdd>
+                    
+            </CreditCardChargeAdd>
+    </CreditCardChargeAddRq>
+    </QBXMLMsgsRq>
+    </QBXML>
+    """.format(credit_card=credit_card, 
+        vendor=vendor,
+        date=date,
+        ref_number=ref_number,
+        memo=memo, 
+        expense_account=expense_account,
+        amount=amount,
+        expense_description=expense_description
+        )
+
+    return reqXML
+
+
+
+def process_response(response):
+        
+    qbxml_root = etree.fromstring(response)
+
+    assert qbxml_root.tag == 'QBXML'
+
+    qbxml_msg_rs = qbxml_root[0]
+    
+    assert qbxml_msg_rs.tag == 'QBXMLMsgsRs'
+
+    response_body_root = qbxml_msg_rs[0]
+
+    assert 'statusCode' in response_body_root.attrib  
+
+    return response_body_root
+
+    
+def process_query_response(response): 
+
+    response_body_root = process_response(response)
+
+
+    resp = []
+    for x in range(len(response_body_root)):
+        children = response_body_root[x].getchildren()
+        tmp = {}
+        for child in children:
+            tmp[child.tag] = child.text 
+
+        resp.append(tmp)
+    return resp 

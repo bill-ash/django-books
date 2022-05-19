@@ -162,3 +162,10 @@ cython_debug/
 conf
 conf/conf conf/manage.py
 conf/ 
+abl
+abl/
+abl/*
+
+.gitmodules/
+.gitmodules
+*.gitmodules

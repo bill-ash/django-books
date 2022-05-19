@@ -1,0 +1,9 @@
+asgiref==3.5.2
+backports.zoneinfo==0.2.1
+Django==4.0.4
+-e git+https://github.com/bill-ash/django-books@46a80e709fd42b31e8158f503f02e47cf3f1ded1#egg=django_books
+lxml==4.8.0
+pkg_resources==0.0.0
+pytz==2022.1
+spyne==2.14.0
+sqlparse==0.4.2
