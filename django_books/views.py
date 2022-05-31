@@ -18,6 +18,7 @@ from django_books.models import ServiceAccount, TicketQueue
 
 import pandas as pd 
 
+
 class QBWC_CODES:
     """
     Response codes from webconnector
@@ -63,19 +64,14 @@ class QuickBooksService(ServiceBase):
             # <UserName> </UserName> field in the .qwc file installed to WebConnector.
             if ServiceAccount.objects.get(qbid=strUserName).password == strPassword:
                 # If there is new work to be processed check for it here. 
-                if TicketQueue.objects.filter(status='5').count() > 0: # Approved
-                    ticket = TicketQueue.objects.filter(status='5').first().ticket
+                if TicketQueue.objects.filter(status='1').count() > 0: # Created
+                    ticket = TicketQueue.objects.filter(status='1').first().ticket
                     print('Success!')
                     return [str(ticket), '']
                 else:
                     return ['none', 'none']
         return []
         
-        # return_array = []
-        # create a new session manager which handles the go between Redis and webconnector
-        # realm = session_manager.authenticate(username=strUsername, password=strPassword)
-        return ['none','none']
-
     @srpc(Unicode, Unicode, Unicode, Unicode, _returns=Integer)
     def receiveResponseXML(ticket, response, hresult, message): 
         """
@@ -101,24 +97,76 @@ class QuickBooksService(ServiceBase):
         
         try:
             resp = process_response(response)
-            resp = process_query_response(response)
+            resp_query = process_query_response(response)
+
         except Exception as e:
             print(e)
             resp = {}
 
-        breakpoint()
-        # if resp.get('statusSeverity') == 'Error' or hresult is not None:
-        #     error = Expense.objects.filter(status='APPROVED').first()
-        #     error.status = 'CLOSED'
-        #     error.save()
-        # else: 
-        #     success = Expense.objects.filter(status='APPROVED').first()
-        #     success.status = 'CLOSED'
-        #     success.save()
+        # breakpoint()
 
-        # if Expense.objects.filter(status='APPROVED').count() > 0:
+        ticket = TicketQueue.objects.get(ticket=ticket)
+        ticket_model = ticket.get_model()
+        
+        if ticket.method == 'GET': 
+            try:
+                ticket_model.get_response(resp_query)
+                # success
+                ticket.status = '4'
+                ticket.save()
+            
+            except Exception as e:
+                print(e)
+                # failed
+                ticket.status = '3'
+                ticket.save()
+
+        if ticket.method == 'POST': 
+            try:
+                print('\n'*4)
+                print('Updating bill ref number')
+                print('\n'*4)
+                # breakpoint()
+                assert True == ticket_model.post_response(resp_query)
+                if ticket_model.objects.filter(batch_id=str(ticket.ticket)).exclude(status='BATCH').count() >= 1: 
+                    print('\n'*4)
+                    print('more work to do')
+                    print('\n'*4)
+                    return 90 
+                else: 
+                    # success
+                    print('\n'*4)
+                    print('complete work success')
+                    print('\n'*4)
+                    ticket.status = '4'
+                    ticket.save()
+                    return 100 
+
+            except Exception as e:
+                print('\n'*4)
+                print('fail')
+                print('\n'*4)
+                ticket.status = '3'
+                # ticket.save()
+                print(e)
+                return 100 
+
+        print('ERROR')
+        if resp.get('statusSeverity') == 'Error' or hresult is not None:
+            pass
+            # error = Expense.objects.filter(status='APPROVED').first()
+            # error.status = 'CLOSED'
+            # error.save()
+        else: 
+            pass
+            # success = Expense.objects.filter(status='APPROVED').first()
+            # success.status = 'CLOSED'
+            # success.save()
+
+        # if the calling ticket has additional work to be completed... 
+        # if ticket_model.objects.filter(batch_id=str(ticket.ticket), status='CLOSED').count() > 0:
         # # return session_manager.process_response(ticket, response, hresult, message)
-        #     return 90
+            return 90
         return 100
 
     @srpc(Unicode, Unicode, Unicode, Unicode, Integer, Integer, _returns=String)
@@ -129,25 +177,21 @@ class QuickBooksService(ServiceBase):
         print('strCompanyFileName', strCompanyFileName)
         print('qbXMLCountry', qbXMLCountry)
 
-        realm = TicketQueue.objects.get(ticket=ticket)
-        # Look up all objects associated with ticket awaiting processing 
-        # session_manager.check_iterating_request(request, ticket)
-        # expense = Expense.objects.filter(status='APPROVED').first()
-        xml = query_custom_txn()
+        ticket = TicketQueue.objects.get(ticket=ticket)
+        model = ticket.get_model()
+
         # breakpoint()
-        # xml = add_credit_card_payment(expense.txn_card, 
-        #     expense.bill_vendor,
-        #     expense.txn_date.strftime('%Y-%m-%d'), 
-        #     expense.bill_ref,
-        #     expense.txn_member_name,
-        #     expense.gl_account,
-        #     expense.txn_amount,
-        #     expense.description or 'DEFAULT DESC', 
-        #     )
-        # print(xml)
-        # xml = add_customer(name='SuperUser' + datetime.now().strftime('%y%m%d%s'))
+        # from expenses.models import Expense 
         
-        return xml
+        if ticket.method == 'GET':
+            qbxml = model.get()
+        else: 
+            print('sending request.......')
+            qbxml = model.post(str(ticket.ticket))
+            print('\n\n\n\n')
+            print(qbxml)
+            print('\n\n\n\n')
+        return qbxml
 
     @srpc(Unicode, _returns=Unicode)
     def clientVersion(strVersion, *args, **kwargs):

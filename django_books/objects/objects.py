@@ -7,6 +7,7 @@ def query_account():
             <QBXML>
             <QBXMLMsgsRq onError="stopOnError">
                 <AccountQueryRq requestID="1">
+                    <ActiveStatus>All</ActiveStatus> 
                 </AccountQueryRq>
             </QBXMLMsgsRq>
         </QBXML>
@@ -131,25 +132,25 @@ def add_credit_card_payment(credit_card='CalOil Card',
     <QBXML>
     <QBXMLMsgsRq onError="stopOnError">
         <CreditCardChargeAddRq>
-            <CreditCardChargeAdd> <!-- required -->
-            <AccountRef> <!-- required -->                                        
-                <FullName>{credit_card}</FullName> <!-- optional -->
+            <CreditCardChargeAdd> 
+            <AccountRef>                                         
+                <FullName>{credit_card}</FullName>
             </AccountRef>
 
-            <PayeeEntityRef> <!-- optional -->
-                <FullName >{vendor}</FullName> <!-- optional -->
+            <PayeeEntityRef>
+                <FullName >{vendor}</FullName>
             </PayeeEntityRef>
             
-            <TxnDate >{date}</TxnDate> <!-- optional -->
-            <RefNumber >{ref_number}</RefNumber> <!-- optional -->
-            <Memo >{memo}</Memo> <!-- optional -->
+            <TxnDate >{date}</TxnDate> 
+            <RefNumber >{ref_number}</RefNumber>
+            <Memo >{memo}</Memo> 
             
-            <ExpenseLineAdd> <!-- optional, may repeat -->
-                <AccountRef> <!-- optional -->
-                    <FullName >{expense_account}</FullName> <!-- optional -->
+            <ExpenseLineAdd> 
+                <AccountRef> 
+                    <FullName >{expense_account}</FullName>
                 </AccountRef>
-                <Amount >{amount}</Amount> <!-- optional -->
-                <Memo >{expense_description}</Memo> <!-- optional -->
+                <Amount >{amount}</Amount> 
+                <Memo >{expense_description}</Memo> 
             </ExpenseLineAdd>
                     
             </CreditCardChargeAdd>
