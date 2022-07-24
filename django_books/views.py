@@ -1,23 +1,22 @@
-from datetime import datetime
-from lxml import etree
+import logging
+import pandas as pd 
 
 from datetime import datetime 
+from lxml import etree
 from uuid import uuid4
 
 from django.shortcuts import render
+from django.contrib.auth import get_user_model
 from spyne.decorator import rpc, srpc
 from spyne.model.complex import Array, Unicode
 from spyne.model.primitive import Integer, String
 from spyne.service import ServiceBase
 
-from django.contrib.auth import get_user_model
-
 from django_books.objects import *
-
 from django_books.models import ServiceAccount, TicketQueue
 
-import pandas as pd 
 
+logger = logging.getLogger(__name__)
 
 class QBWC_CODES:
     """
@@ -63,12 +62,17 @@ class QuickBooksService(ServiceBase):
             # Create a service account and make sure the username matches the UUID passed to the 
             # <UserName> </UserName> field in the .qwc file installed to WebConnector.
             if ServiceAccount.objects.get(qbid=strUserName).password == strPassword:
+                logger.debug('Successfully logged in')
+                
                 # If there is new work to be processed check for it here. 
                 if TicketQueue.objects.filter(status='1').count() > 0: # Created
                     ticket = TicketQueue.objects.filter(status='1').first().ticket
-                    print('Success!')
+                    logger.debug('Processing Tickets...')
+
                     return [str(ticket), '']
                 else:
+                    logger.debug('No tickets in queue...')
+                    
                     return ['none', 'none']
         return []
         
@@ -87,20 +91,20 @@ class QuickBooksService(ServiceBase):
             Needs to be handled by the session manager.  
         """
 
-        print('receiveResponseXML()')
-        print("ticket=" + ticket)
-        print("response=" + response)
+        logger.debug('receiveResponseXML()')
+        logger.debug("ticket=" + ticket)
+        logger.debug("response=" + response)
         
         if hresult:
-            print("hresult=" + hresult)
-            print("message=" + message)
+            logger.debug("hresult=" + hresult)
+            logger.debug("message=" + message)
         
         try:
             resp = process_response(response)
             resp_query = process_query_response(response)
 
         except Exception as e:
-            print(e)
+            logger.error(e)
             resp = {}
 
         # breakpoint()
@@ -124,19 +128,19 @@ class QuickBooksService(ServiceBase):
         if ticket.method == 'POST': 
             try:
                 print('\n'*4)
-                print('Updating bill ref number')
+                logger.debug('Updating bill ref number')
                 print('\n'*4)
-                # breakpoint()
+                
                 assert True == ticket_model.post_response(resp_query)
                 if ticket_model.objects.filter(batch_id=str(ticket.ticket)).exclude(status='BATCH').count() >= 1: 
                     print('\n'*4)
-                    print('more work to do')
+                    logger.debug('more work to do')
                     print('\n'*4)
                     return 90 
                 else: 
                     # success
                     print('\n'*4)
-                    print('complete work success')
+                    logger.debug('complete work success')
                     print('\n'*4)
                     ticket.status = '4'
                     ticket.save()
@@ -144,7 +148,7 @@ class QuickBooksService(ServiceBase):
 
             except Exception as e:
                 print('\n'*4)
-                print('fail')
+                logger.error('fail')
                 print('\n'*4)
                 ticket.status = '3'
                 # ticket.save()
@@ -171,11 +175,11 @@ class QuickBooksService(ServiceBase):
 
     @srpc(Unicode, Unicode, Unicode, Unicode, Integer, Integer, _returns=String)
     def sendRequestXML(ticket, strHCPResponse, strCompanyFileName, qbXMLCountry, qbXMLMajorVers, qbXMLMinorVers):
-        print('sendRequestXML() has been called')
-        print('ticket:', ticket)
-        print('strHCPResponse', strHCPResponse)
-        print('strCompanyFileName', strCompanyFileName)
-        print('qbXMLCountry', qbXMLCountry)
+        logger.debug('sendRequestXML() has been called')
+        logger.debug('ticket:', ticket)
+        logger.debug('strHCPResponse', strHCPResponse)
+        logger.debug('strCompanyFileName', strCompanyFileName)
+        logger.debug('qbXMLCountry', qbXMLCountry)
 
         ticket = TicketQueue.objects.get(ticket=ticket)
         model = ticket.get_model()
@@ -188,9 +192,9 @@ class QuickBooksService(ServiceBase):
         else: 
             print('sending request.......')
             qbxml = model.post(str(ticket.ticket))
-            print('\n\n\n\n')
-            print(qbxml)
-            print('\n\n\n\n')
+            print('\n'*4)
+            logger.debug(qbxml)
+            print('\n'*4)
         return qbxml
 
     @srpc(Unicode, _returns=Unicode)
@@ -207,8 +211,8 @@ class QuickBooksService(ServiceBase):
         if strVersion == '2.3.0.207':
             print('Success!')
         # breakpoint()
-        print('requesting auth')
-        print('clientVersion(): version=%s' % strVersion)
+        logger.debug('requesting auth')
+        logger.debug('clientVersion(): version=%s' % strVersion)
         return ''
 
 
@@ -221,7 +225,7 @@ class QuickBooksService(ServiceBase):
             ctx (DjangoHttpMethodContext): spyne processed request wasdl
             ticket (str): ticket that is completed?
         """
-        print('closeConnection(): ticket=%s' % ticket)
+        logger.debug('closeConnection(): ticket=%s' % ticket)
         # This is where we can clean up any work 
         # realm = session_manager.get_realm(ticket)
         # session_manager.close_session(realm)
@@ -239,7 +243,7 @@ class QuickBooksService(ServiceBase):
         @return string value "done" to indicate web service is finished or the full path of the different company for
         retrying _set_connection.
         """
-        print('connectionError(): ticket=%s, hresult=%s, message=%s' % (ticket, hresult, message))
+        logger.debug('connectionError(): ticket=%s, hresult=%s, message=%s' % (ticket, hresult, message))
         # realm = session_manager.get_realm(ticket)
         # session_manager.close_session(realm)
         return 'done'
@@ -256,7 +260,7 @@ class QuickBooksService(ServiceBase):
         """
         # In the case of expenses, errors should be wrapped in some try logic and displayed on completion 
         # of the work being preformed -- would not get batched. 
-        print('getLastError(): ticket=%s' % ticket)
+        logger.debug('getLastError(): ticket=%s' % ticket)
 
 
     @srpc(Unicode, _returns=Unicode)
@@ -270,7 +274,7 @@ class QuickBooksService(ServiceBase):
         # Don't remember reading about this -- not sure if it's required
         version ='2.2.0.34'
 
-        print('getServerVersion(): version=%s' % version)
+        logger.debug('getServerVersion(): version=%s' % version)
         return version
 
     @srpc(Unicode, _returns=Unicode)
@@ -281,7 +285,7 @@ class QuickBooksService(ServiceBase):
         @return string value "Done" should be returned when interactive session is over
         """
         # for completeness - don't intend on using 
-        print('interactiveDone(): ticket=%s' % ticket)
+        logger.debug('interactiveDone(): ticket=%s' % ticket)
         return 'done'
         
     @rpc(Unicode, Unicode, _returns=Unicode)
@@ -293,17 +297,17 @@ class QuickBooksService(ServiceBase):
         @param reason the reason for the rejection of interactive mode
         @return string value "Done" should be returned when interactive session is over
         """
-        print('interactiveRejected()')
-        print(ticket)
-        print(reason)
+        logger.debug('interactiveRejected()')
+        logger.debug(ticket)
+        logger.debug(reason)
         return 'Interactive mode rejected'
 
  
     @srpc(Unicode, Unicode, _returns=Unicode)
     def interactiveUrl(ticket, sessionID):
-        print('interactiveUrl')
-        print(ticket)
-        print(sessionID)
+        logger.debug('interactiveUrl')
+        logger.debug(ticket)
+        logger.debug(sessionID)
         return ''
 
 

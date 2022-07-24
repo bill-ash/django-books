@@ -1,3 +1,9 @@
+# These are methods that should be implemented on the client side 
+# App user wants to implement a customer: 
+# - get_query() -> returns qbxml to query customers 
+# - post_query() -> returns qbxml to create a new customer in QB
+# - patch_query() -> returns qbxml to update a customer in QB 
+
 from datetime import datetime
 from lxml import etree
 

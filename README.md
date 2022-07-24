@@ -2,8 +2,28 @@
 
 Functional django application for interacting with the QuickBooks Desktop Webconnector.
 
+Find example applications in `/examples/`.
 
-# TODOS
+## Install 
+
+Install the latest version from github: 
+
+```
+python -m pip install git+httsp://github.com/bill-ash/django-books
+```
+
+or from pip using: 
+
+```
+python -m pip --upgrade django-books
+```
+
+## Examples 
+
+Two sample apps are included for adding new customers and jobs as well as creating expenses via credit-card charges.
+
+
+## TODOS
 
 Create a service account which is responsible for communicating with the Webconnector. 
 - Add a method that produces a .qwc file that is installed to webconnector
@@ -18,7 +38,7 @@ queue is the work to be preformed on the next web connector sync.
 Ticket log for syncing QB data with external resources/dashboards is different from importing new records 
 from django. 
 
-# Resources 
+## Resources 
 
 Heavily inspired by previous attempts at talking to Quick Books desktop with the goal of using 
 python3 and current django version and no redis dependency. 

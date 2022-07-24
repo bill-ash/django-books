@@ -8,17 +8,25 @@ from django.contrib.contenttypes.models import ContentType
 
 
 class ServiceAccount(models.Model): 
-    # Should be the file name or something 
+    
+    # Name of the QuickBooks File 
     name = models.CharField(max_length=30)
+    # The file path for the QB file 
+    file_path = models.CharField(max_length=90, blank=True, null=True)
+    
+    # UUID to use in the .qwc file 
     qbid = models.CharField(max_length=50, default=uuid4)
     created_on = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
+    
+    # Default password - \\TODO hash this
     password = models.CharField(max_length=30, default='test')
 
     def __str__(self): 
         return self.name
 
 class TicketQueue(models.Model):
+    
     STATUS = (
         ('1', 'Created', ),
         ('5', 'Approved'),
@@ -27,6 +35,7 @@ class TicketQueue(models.Model):
         ('3', 'Failed', ),
         ('4', 'Success'),
     )
+    
     ticket = models.UUIDField(default=uuid4)
     
     status = models.CharField(max_length=15, choices=STATUS, default='1')
