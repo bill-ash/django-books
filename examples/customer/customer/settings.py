@@ -29,10 +29,14 @@ ALLOWED_HOSTS = []
 
 
 # Application definition
+QBWC_VERSION = ''
 
 INSTALLED_APPS = [
     # Add django books and django books urls 
     'django_books',
+    
+    # sample app 
+    'qbwc',
 
     'django.contrib.admin',
     'django.contrib.auth',

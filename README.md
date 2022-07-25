@@ -62,3 +62,14 @@ web connector.
 Additionaly, the forums are somewhat active: 
 
 - https://help.developer.intuit.com/s/
+
+
+## Notes 
+
+A single application will work on many QB files. 
+
+- Associate an app with a specific QB file. 
+
+
+Usernames (service accounts) are associated with specific files (a list of files). Test the authing 
+username 

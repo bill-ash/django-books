@@ -7,6 +7,18 @@
 from datetime import datetime
 from lxml import etree
 
+def query(model): 
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <%sQueryRq requestID="1"> 
+                </%sQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """ % (model, model)
+    return reqXML
+
 def query_account(): 
     reqXML = """
         <?qbxml version="15.0"?>
@@ -198,13 +210,14 @@ def process_query_response(response):
 
     response_body_root = process_response(response)
 
-
     resp = []
     for x in range(len(response_body_root)):
         children = response_body_root[x].getchildren()
         tmp = {}
         for child in children:
             tmp[child.tag] = child.text 
-
         resp.append(tmp)
+
     return resp 
+
+    

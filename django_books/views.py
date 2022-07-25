@@ -15,6 +15,7 @@ from spyne.service import ServiceBase
 from django_books.objects import *
 from django_books.models import ServiceAccount, TicketQueue
 
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,6 @@ class QuickBooksService(ServiceBase):
          - Invalid user - not authenticated
             - ['', ''] | ['nvu', 'nvu']
 
-
         Args:
         @rpc >> ctx (DjangoHttpMethodContext): spyne.server.django.DjangoHttpMethodContext Inspect the information 
         returned to be parsed by spyne from the webconnector.
@@ -65,16 +65,48 @@ class QuickBooksService(ServiceBase):
                 logger.debug('Successfully logged in')
                 
                 # If there is new work to be processed check for it here. 
-                if TicketQueue.objects.filter(status='1').count() > 0: # Created
-                    ticket = TicketQueue.objects.filter(status='1').first().ticket
+                if TicketQueue.process.get_tickets() > 0: 
+                # if TicketQueue.objects.filter(status='1').count() > 0: # Created
+                    # ticket = TicketQueue.objects.filter(status='1').first().ticket
+                    ticket = TicketQueue.process.get_next_ticket()
                     logger.debug('Processing Tickets...')
 
-                    return [str(ticket), '']
+                    return [ticket, '']
                 else:
                     logger.debug('No tickets in queue...')
                     
                     return ['none', 'none']
         return []
+
+
+    @srpc(Unicode, Unicode, Unicode, Unicode, Integer, Integer, _returns=String)
+    def sendRequestXML(ticket, strHCPResponse, strCompanyFileName, qbXMLCountry, qbXMLMajorVers, qbXMLMinorVers):
+        logger.debug('sendRequestXML() has been called')
+        logger.debug('ticket:', ticket)
+        
+        # Before xml is sent to be processed, check it is being sent to the correct file 
+        logger.debug('strCompanyFileName', strCompanyFileName)
+        
+        t = TicketQueue.objects.get(ticket=ticket)
+        
+        model = t.get_model()
+        breakpoint()
+    
+        if t.method == 'GET':
+            qbxml = model.get_query()
+            logger.debug(qbxml)
+
+        elif t.method == 'POST': 
+            qbxml = model.post_query(t.ticket)
+            logger.debug(qbxml)
+
+        else:
+            qbxml = model.patch_query()
+            
+        t.status = TicketQueue.TicketStatus.PROCESSING
+        t.save()
+
+        return qbxml
         
     @srpc(Unicode, Unicode, Unicode, Unicode, _returns=Integer)
     def receiveResponseXML(ticket, response, hresult, message): 
@@ -95,68 +127,78 @@ class QuickBooksService(ServiceBase):
         logger.debug("ticket=" + ticket)
         logger.debug("response=" + response)
         
+        # Check to see if there is an error message
         if hresult:
-            logger.debug("hresult=" + hresult)
-            logger.debug("message=" + message)
+            logger.error("hresult=" + hresult)
+            logger.error("message=" + message)
         
-        try:
-            resp = process_response(response)
-            resp_query = process_query_response(response)
-
-        except Exception as e:
-            logger.error(e)
-            resp = {}
 
         # breakpoint()
 
-        ticket = TicketQueue.objects.get(ticket=ticket)
-        ticket_model = ticket.get_model()
+        try:
+            # Process the response from QuickBooks - should this be model dependent?
+            resp_code = process_response(response).get('statusSeverity')
+            resp_query = process_query_response(response)
+
+        except Exception as e:
+            logger.error(str(e))
+            resp = {}
+
+
+        t = TicketQueue.objects.get(ticket=ticket)
+        model = t.get_model()
         
-        if ticket.method == 'GET': 
+        if t.method == t.TicketMethod.GET: 
             try:
-                ticket_model.get_response(resp_query)
-                # success
-                ticket.status = '4'
-                ticket.save()
+                logger.debug('Processing GET query response')
+                model.process_get(ticket, resp_query)
+                t.status = t.TicketStatus.SUCCESS
+                t.save()
             
             except Exception as e:
-                print(e)
-                # failed
-                ticket.status = '3'
-                ticket.save()
+                logger.error(str(e))
+                t.status = t.TicketStatus.FAILED
+                t.save()
 
-        if ticket.method == 'POST': 
+        elif t.method == t.TicketMethod.POST: 
             try:
-                print('\n'*4)
-                logger.debug('Updating bill ref number')
-                print('\n'*4)
+                logger.debug('Processing POST query response')
+                # Errors get handled in processing function and bubble to { getLastError() }
+                model.process_post(ticket, *resp_query)
                 
-                assert True == ticket_model.post_response(resp_query)
-                if ticket_model.objects.filter(batch_id=str(ticket.ticket)).exclude(status='BATCH').count() >= 1: 
-                    print('\n'*4)
+                # No error - check for additional work to be preformed
+                # ticket.model.objects.filter()
+                if model.objects.filter(
+                        _batch_id=t.ticket
+                        ).exclude(
+                            _batch_status=model.BatchStatus.BATCHED
+                            ).count() >= 1: 
                     logger.debug('more work to do')
-                    print('\n'*4)
                     return 90 
+
                 else: 
                     # success
-                    print('\n'*4)
                     logger.debug('complete work success')
-                    print('\n'*4)
-                    ticket.status = '4'
-                    ticket.save()
+                    t.status = t.TicketStatus.SUCCESS
+                    t.save()
                     return 100 
 
             except Exception as e:
-                print('\n'*4)
-                logger.error('fail')
-                print('\n'*4)
-                ticket.status = '3'
-                # ticket.save()
-                print(e)
-                return 100 
+                # Don't try to handle exception end the operation 
+                logger.error(str(e))
+                t.status = t.TicketStatus.ERROR
+                raise Exception 
+                # return 100 
+        else: 
+            try: 
+                logger.debug('Processing POST query response')
 
-        # print('ERROR')
-        if resp.get('statusSeverity') == 'Error' or hresult is not None:
+            except Exception as e: 
+                logger.error(str(e))
+                raise Exception('Error in PATCH process response')
+
+
+        if resp_code == 'Error' or hresult is not None:
             pass
             # error = Expense.objects.filter(status='APPROVED').first()
             # error.status = 'CLOSED'
@@ -173,30 +215,20 @@ class QuickBooksService(ServiceBase):
             return 90
         return 100
 
-    @srpc(Unicode, Unicode, Unicode, Unicode, Integer, Integer, _returns=String)
-    def sendRequestXML(ticket, strHCPResponse, strCompanyFileName, qbXMLCountry, qbXMLMajorVers, qbXMLMinorVers):
-        logger.debug('sendRequestXML() has been called')
-        logger.debug('ticket:', ticket)
-        logger.debug('strHCPResponse', strHCPResponse)
-        logger.debug('strCompanyFileName', strCompanyFileName)
-        logger.debug('qbXMLCountry', qbXMLCountry)
 
-        ticket = TicketQueue.objects.get(ticket=ticket)
-        model = ticket.get_model()
 
-        # breakpoint()
-        # from expenses.models import Expense 
-        
-        if ticket.method == 'GET':
-            qbxml = model.get()
-        else: 
-            print('sending request.......')
-            qbxml = model.post(str(ticket.ticket))
-            print('\n'*4)
-            logger.debug(qbxml)
-            print('\n'*4)
-        return qbxml
+    @srpc(Unicode, _returns=Unicode)
+    def serverVersion(strVersion, *args): 
+        """
+        Provide a way for web-service to notify web connector of it’s version and other details about version
+        @param ticket the ticket from web connector supplied by web service during call to authenticate method
+        @return string message string describing the server version and any other information that user may want to see
+        """
+        version=settings.QBWC_VERSION
+        logger.debug('getServerVersion(): version=%s' % version)
+        return version
 
+    
     @srpc(Unicode, _returns=Unicode)
     def clientVersion(strVersion, *args, **kwargs):
         """
@@ -205,13 +237,8 @@ class QuickBooksService(ServiceBase):
         Args:
             strVersion (str): QBWC version?
         """
-        # print(type(ctx))
-        # print(*args)
-        # print(**kwargs)
-        if strVersion == '2.3.0.207':
-            print('Success!')
-        # breakpoint()
-        logger.debug('requesting auth')
+        if strVersion == settings.QBWC_VERSION:
+            logger.debug('Matches current version')
         logger.debug('clientVersion(): version=%s' % strVersion)
         return ''
 
@@ -220,15 +247,15 @@ class QuickBooksService(ServiceBase):
     def closeConnection(ctx, ticket): 
         """
         Close the current connection with QuickBooks Webconnector.
+        This is where we can clean up any work 
+        realm = session_manager.get_realm(ticket)
+        session_manager.close_session(realm)
 
         Args:
             ctx (DjangoHttpMethodContext): spyne processed request wasdl
             ticket (str): ticket that is completed?
         """
         logger.debug('closeConnection(): ticket=%s' % ticket)
-        # This is where we can clean up any work 
-        # realm = session_manager.get_realm(ticket)
-        # session_manager.close_session(realm)
         return 'ok'
 
     
@@ -258,57 +285,44 @@ class QuickBooksService(ServiceBase):
         The web connector writes this message to the web connector log for the user and also displays it in the web
         connector’s Status column.
         """
-        # In the case of expenses, errors should be wrapped in some try logic and displayed on completion 
-        # of the work being preformed -- would not get batched. 
+        # \\TODO ticket needs method ticket.response.get_last_error() 
         logger.debug('getLastError(): ticket=%s' % ticket)
+        return f'Error processing ticket: {ticket}'
 
-
-    @srpc(Unicode, _returns=Unicode)
-    def getServerVersion(ticket): 
-        """
-        Provide a way for web-service to notify web connector of it’s version and other details about version
-        @param ticket the ticket from web connector supplied by web service during call to authenticate method
-        @return string message string describing the server version and any other information that user may want to see
-        """
-
-        # Don't remember reading about this -- not sure if it's required
-        version ='2.2.0.34'
-
-        logger.debug('getServerVersion(): version=%s' % version)
-        return version
-
-    @srpc(Unicode, _returns=Unicode)
-    def interactiveDone(ticket): 
-        """
-        Allow the web service to indicate to web connector that it is done with interactive mode.
-        @param ticket the ticket from web connector supplied by web service during call to authenticate method
-        @return string value "Done" should be returned when interactive session is over
-        """
-        # for completeness - don't intend on using 
-        logger.debug('interactiveDone(): ticket=%s' % ticket)
-        return 'done'
-        
-    @rpc(Unicode, Unicode, _returns=Unicode)
-    def interactiveRejected(ctx, ticket, reason):
-        """
-        Allow the web service to take alternative action when the interactive session it requested was
-        rejected by the user or by timeout in the absence of the user.
-        @param ticket the ticket from web connector supplied by web service during call to authenticate method
-        @param reason the reason for the rejection of interactive mode
-        @return string value "Done" should be returned when interactive session is over
-        """
-        logger.debug('interactiveRejected()')
-        logger.debug(ticket)
-        logger.debug(reason)
-        return 'Interactive mode rejected'
 
  
-    @srpc(Unicode, Unicode, _returns=Unicode)
-    def interactiveUrl(ticket, sessionID):
-        logger.debug('interactiveUrl')
-        logger.debug(ticket)
-        logger.debug(sessionID)
-        return ''
+    # @srpc(Unicode, _returns=Unicode)
+    # def interactiveDone(ticket): 
+    #     """
+    #     Allow the web service to indicate to web connector that it is done with interactive mode.
+    #     @param ticket the ticket from web connector supplied by web service during call to authenticate method
+    #     @return string value "Done" should be returned when interactive session is over
+    #     """
+    #     # for completeness - don't intend on using 
+    #     logger.debug('interactiveDone(): ticket=%s' % ticket)
+    #     return 'done'
+        
+    # @rpc(Unicode, Unicode, _returns=Unicode)
+    # def interactiveRejected(ctx, ticket, reason):
+    #     """
+    #     Allow the web service to take alternative action when the interactive session it requested was
+    #     rejected by the user or by timeout in the absence of the user.
+    #     @param ticket the ticket from web connector supplied by web service during call to authenticate method
+    #     @param reason the reason for the rejection of interactive mode
+    #     @return string value "Done" should be returned when interactive session is over
+    #     """
+    #     logger.debug('interactiveRejected()')
+    #     logger.debug(ticket)
+    #     logger.debug(reason)
+    #     return 'Interactive mode rejected'
+
+ 
+    # @srpc(Unicode, Unicode, _returns=Unicode)
+    # def interactiveUrl(ticket, sessionID):
+    #     logger.debug('interactiveUrl')
+    #     logger.debug(ticket)
+    #     logger.debug(sessionID)
+    #     return ''
 
 
 
