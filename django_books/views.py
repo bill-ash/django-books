@@ -36,8 +36,8 @@ class QBWC_CODES:
 
 class QuickBooksService(ServiceBase): 
 
-    @rpc(Unicode, Unicode, _returns=Array(Unicode))
-    def authenticate(ctx, strUserName, strPassword):
+    @srpc(Unicode, Unicode, _returns=Array(Unicode))
+    def authenticate(strUserName, strPassword):
         """
         Authenticate with QuickBooks WebConnector. 
         Return value schedule: 
@@ -63,7 +63,6 @@ class QuickBooksService(ServiceBase):
             # <UserName> </UserName> field in the .qwc file installed to WebConnector.
             if ServiceAccount.objects.get(qbid=strUserName).password == strPassword:
                 logger.debug('Successfully logged in')
-                
                 # If there is new work to be processed check for it here. 
                 if TicketQueue.process.get_tickets() > 0: 
                 # if TicketQueue.objects.filter(status='1').count() > 0: # Created
@@ -79,18 +78,20 @@ class QuickBooksService(ServiceBase):
         return []
 
 
-    @srpc(Unicode, Unicode, Unicode, Unicode, Integer, Integer, _returns=String)
-    def sendRequestXML(ticket, strHCPResponse, strCompanyFileName, qbXMLCountry, qbXMLMajorVers, qbXMLMinorVers):
+    @srpc(Unicode, Unicode, Unicode, Unicode, Integer, Integer, _returns=String) #Unicode, Unicode, Unicode,
+    def sendRequestXML(ticket, strHCPResponse, strCompanyFileName, qbXMLCountry, qbXMLMajorVers, qbXMLMinorVers): 
         logger.debug('sendRequestXML() has been called')
-        logger.debug('ticket:', ticket)
         
         # Before xml is sent to be processed, check it is being sent to the correct file 
-        logger.debug('strCompanyFileName', strCompanyFileName)
+        # Weird error when logging these variable not converted to string?
+        # logger.debug('ticket:', ticket)
+        # logger.debug('strCompanyFileName', str(strCompanyFileName))
         
         t = TicketQueue.objects.get(ticket=ticket)
         
         model = t.get_model()
-        breakpoint()
+
+        # breakpoint()
     
         if t.method == 'GET':
             qbxml = model.get_query()
@@ -131,14 +132,11 @@ class QuickBooksService(ServiceBase):
         if hresult:
             logger.error("hresult=" + hresult)
             logger.error("message=" + message)
-        
-
-        # breakpoint()
-
+                
         try:
             # Process the response from QuickBooks - should this be model dependent?
             resp_code = process_response(response).get('statusSeverity')
-            resp_query = process_query_response(response)
+            response = process_query_response(response)
 
         except Exception as e:
             logger.error(str(e))
@@ -151,7 +149,7 @@ class QuickBooksService(ServiceBase):
         if t.method == t.TicketMethod.GET: 
             try:
                 logger.debug('Processing GET query response')
-                model.process_get(ticket, resp_query)
+                model.process_get(ticket, response)
                 t.status = t.TicketStatus.SUCCESS
                 t.save()
             
@@ -164,7 +162,7 @@ class QuickBooksService(ServiceBase):
             try:
                 logger.debug('Processing POST query response')
                 # Errors get handled in processing function and bubble to { getLastError() }
-                model.process_post(ticket, *resp_query)
+                model.process_post(ticket, *response)
                 
                 # No error - check for additional work to be preformed
                 # ticket.model.objects.filter()
