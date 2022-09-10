@@ -1,22 +1,21 @@
 import logging 
 import re
-from django.db import models
-from django_books.models import BaseObjectMixin
 
+from django.db import models
+
+from django_books.models import BaseObjectMixin
 from django_books.objects import query, add_customer
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('django_books')
 
 class Customer(BaseObjectMixin): 
 
     name = models.CharField(max_length=50)
     type = models.CharField(max_length = 20, default='test')
     
-
     # Defines how to make and requests and handle responses... 
     def get_query(name='Customer', *args, **kwargs):
         return query(name)
-
 
     def post_query(ticket, *args, **kwargs): 
         c = Customer.objects.filter(
@@ -26,16 +25,17 @@ class Customer(BaseObjectMixin):
         return add_customer(c.name)
 
 
-
     def patch_query(*args, **kwargs): 
         raise NotImplementedError
 
-
-
-    def process_get(resp = None, *args, **kwargs): 
+    def process_get(ticket, resp = None, *args, **kwargs): 
         """
         What to do with the response from QB - parsed as a list of dictionaries...
         """ 
+        # breakpoint()
+        if isinstance(resp, list): 
+            for c in resp: 
+                logger.debug(c['Name'])
         return resp
 
 

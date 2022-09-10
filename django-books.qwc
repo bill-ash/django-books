@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<QBWCXML>
+    <AppName>{{}}</AppName>
+    <AppID>{{}}</AppID>
+    <AppURL>{{}}</AppURL>
+    <AppDescription>{{}}</AppDescription>
+    <AppSupport>{{}}</AppSupport>
+    <UserName>{{}}</UserName>
+    <OwnerID>{{ '{' }} {{}} {{ '}' }}</OwnerID>
+    <FileID>{{ '{' }} {{}} {{ '}' }}</FileID>
+    <QBType>QBFS</QBType>
+    <Scheduler>
+        <RunEveryNMinutes>{{}}</RunEveryNMinutes>
+    </Scheduler>
+</QBWCXML>
