@@ -1,14 +1,13 @@
 
-from configparser import MAX_INTERPOLATION_DEPTH
-from uuid import uuid4
 from datetime import datetime 
+from uuid import uuid4
+
 from django.db import models
 
 # model name must be lowercase and unique 
 from django.contrib.contenttypes.models import ContentType 
 
 from django.contrib.auth import get_user_model
-
 
 class ServiceAccount(models.Model): 
     
@@ -17,6 +16,7 @@ class ServiceAccount(models.Model):
 
     # The file path for the QB file 
     file_path = models.CharField(max_length=90, blank=True, null=True)
+    app_url = models.CharField(max_length=90, blank=True, null=True)
     
     # UUID to use in the .qwc file 
     qbid = models.CharField(max_length=50, default=uuid4)
@@ -28,11 +28,34 @@ class ServiceAccount(models.Model):
 
     is_active = models.BooleanField(default=True)
 
+    config = models.TextField(null=True, blank=True)
+
+    @staticmethod
+    def create_qwc_file(app_name='Django Books', url='http://localhost:8080', username=uuid4(), sync_time=0): 
+        return f"""
+            <?xml version='1.0' encoding='UTF-8'?>
+            <QBWCXML>
+                <AppName>{app_name}</AppName>
+                <AppID></AppID>
+                <AppURL>{url}/webconnector/</AppURL>
+                <AppDescription>Django QuickBooks WebConnector</AppDescription>
+                <AppSupport>{url}/support/</AppSupport>
+                <UserName>{username}</UserName>
+                <OwnerID>{{{uuid4()}}}</OwnerID>
+                <FileID>{{{uuid4()}}}</FileID>
+                <QBType>QBFS</QBType>
+                <Scheduler><RunEveryNMinutes>{sync_time}</RunEveryNMinutes></Scheduler>
+            </QBWCXML>
+        """
+
+    def save(self, *args, **kwargs):
+        self.config = self.create_qwc_file(app_name=self.name, url=self.app_url, username=self.qbid, sync_time=0)
+        super(ServiceAccount, self).save(*args, **kwargs)
+
+        
     def __str__(self): 
         return self.name
-
-    def log_qwc_file(): 
-        pass 
+     
 
 class TicketManager(models.Manager): 
     
