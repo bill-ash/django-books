@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class ExpensesConfig(AppConfig):
+class QbwcConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'expenses'
+    name = 'qbwc'
