@@ -10,8 +10,21 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 
 class ServiceAccount(models.Model): 
+    """
+    Service account for the associated QuickBooks file. Generates a .qwc config to be 
+    installed to the QuickBooks web connector. The name, corresponds to the name of the 
+    application or integration goal. File path provides the option to ensure we're updating 
+    or querying the correct QuickBooks file. If a file moves, or is re-named, this would prevent
+    the calling application from making any changes. 
     
-    # Name of the QuickBooks File 
+    URL is the url of the calling app. Must be https:// or localhost. 
+
+    qbid is the guid of the user the web connector will try to auth before accepting new tickets. 
+
+    Password as plain text is helpful for development. No serious risk of exposing even in a security incident 
+    since queries can only be made from QuickBooks and after the UUID is checked as user. 
+    """
+    
     name = models.CharField(max_length=30)
 
     # The file path for the QB file 
@@ -31,7 +44,7 @@ class ServiceAccount(models.Model):
     config = models.TextField(null=True, blank=True)
 
     @staticmethod
-    def create_qwc_file(app_name='Django Books', url='http://localhost:8080', username=uuid4(), sync_time=0): 
+    def create_qwc_file(app_name='Django Books', url='http://localhost:8080', username=uuid4(), sync_time=60): 
         return f"""
             <?xml version='1.0' encoding='UTF-8'?>
             <QBWCXML>
@@ -44,45 +57,35 @@ class ServiceAccount(models.Model):
                 <OwnerID>{{{uuid4()}}}</OwnerID>
                 <FileID>{{{uuid4()}}}</FileID>
                 <QBType>QBFS</QBType>
-                <Scheduler><RunEveryNMinutes>{sync_time}</RunEveryNMinutes></Scheduler>
+                <Scheduler>
+                    <RunEveryNMinutes>{sync_time}</RunEveryNMinutes>
+                </Scheduler>
             </QBWCXML>
         """
 
     def save(self, *args, **kwargs):
-        self.config = self.create_qwc_file(app_name=self.name, url=self.app_url, username=self.qbid, sync_time=0)
+        self.config = self.create_qwc_file(app_name=self.name, url=self.app_url, username=self.qbid)
         super(ServiceAccount, self).save(*args, **kwargs)
 
-        
     def __str__(self): 
         return self.name
      
 
 class TicketManager(models.Manager): 
+    "Used for managing work to be preformed by the web connector."
     
-    def get_tickets(self):
-        """
-        Used during authentication - determines whether or not there is new work 
-        to process
-        """ 
+    def count_queue(self):
+        "Called during authentication; determines whether new work is available."
         return self.filter(status=TicketQueue.TicketStatus.CREATED).count()
-    
-    def get_next_ticket(self):
-        return self.filter(status=TicketQueue.TicketStatus.CREATED).first().ticket
 
-    def post_next_query(self):
-        """
-        When working with a ticket that has many transaction associated with it, returns 
-        the next iteration. 
-        """
-        pass 
+    def get_next_ticket(self):
+        "Called during authentication; returns the next ticket in the stack."
+        return self.filter(status=TicketQueue.TicketStatus.CREATED).first().ticket
 
 
 class TicketQueue(models.Model):
     class TicketStatus(models.TextChoices):
-        """
-        Methods that change state in QuickBooks require a status of 2. GET requests, can 
-        proceed with 1, or greater. 
-         """
+        "Inserts and updates must be APPROVED before being sent."
 
         # A ticket has been created for work to be preformed
         CREATED = ('1', 'Created')
@@ -114,34 +117,24 @@ class TicketQueue(models.Model):
         choices=TicketStatus.choices,
         default=TicketStatus.CREATED
     )
-    method = models.CharField(choices=TicketMethod.choices, max_length=5, default='GET')
+    method = models.CharField(
+        choices=TicketMethod.choices,
+        max_length=5,
+        default=TicketMethod.GET
+    )
 
     # More research: 
     # https://github.com/CiCiUi/django-db-logger
     # Requirement: log all requests & responses with QB 
-    # event_log = models.ForeignKey('TicketLog', )
+    message_log = models.TextField(blank=True,null=True)
 
-    # pg limit 
+    # pg column character limit 
     model = models.CharField(max_length=63) 
-    # Batch method that bundles similar objects together and assisgns the same 
-    # Ticket if to be processed at once... 
-    # 20 expenses are ready to be approved: 
-    #   - select expenses approve
-    #   - tickets go from pending to approved  
-    #   - ticket is created 
-    #   - Many to one relationship?
-    #   - All expenses are updated to use the same ticket number for processings 
-    #   - Ticket does reverse lookup to get a list of all objects that use it as 
-    # a foreign key - iterates through all objects until completion 
-    #   - Each objects is updated on processing - Success, error, fail... 
-    # object = models.CharField(max_length = 20, blank=True, null=True)
-
+   
     created_at = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
-    # On error - screen for filtering for all error requests 
-    # On Error - resolved == False 
-    resolved = models.BooleanField(default=True)
+    
     resolved_by = models.ForeignKey(
         get_user_model(), 
         blank=True, 
@@ -165,9 +158,38 @@ class TicketQueue(models.Model):
         model = ct.model_class()
         return model 
 
+    def get_logs(self, *args, **kwargs):
+        
+        message_log = self.logs.all()
+        
+        if message_log:
+            self.message_log = '\n'.join([c.message for c in message_log])
+        else: 
+            self.message_log = ''
+
+    def save(self, *args, **kwargs): 
+        self.get_logs()
+        super(TicketQueue, self).save(*args, **kwargs)
+
     def __str__(self): 
         return self.model
 
+
+class BaseObjectManager(models.Manager): 
+    
+    def check_for_work(self, ticket, *args, **kwargs): 
+        """
+        Checks the calling model for status unbatched with current ticket id. Ensures that all transactions 
+        assigned a ticket in batching have been executed. 
+        """
+        count = self.filter(batch_ticket=ticket, batch_status='UN_BATCHED').count()
+        return count > 0 
+    
+    def get_next_txn(self, ticket, *args, **kwargs): 
+        "Get the next transaction for processing."
+        return self.filter(batch_ticket=self.ticket).exclude(
+            batch_status=BaseObjectMixin.BatchStatus.BATCHED).first()
+        
 
 class BaseObjectMixin(models.Model): 
     """
@@ -181,48 +203,67 @@ class BaseObjectMixin(models.Model):
         BATCHED = ('BATCHED', 'BATCHED')
         UN_BATCHED = ('UN_BATCHED', 'UN_BATCHED')
 
-    _batch_id = models.CharField(
+    batch_ticket = models.CharField(
         max_length=124, 
         blank=True, 
         null=True
         )
 
-    _batch_status = models.CharField(
+    batch_status = models.CharField(
         max_length=30,
         choices=BatchStatus.choices,
         default=BatchStatus.UN_BATCHED
     )
 
     # QuickBooks Fields
-    _list_id = models.CharField(max_length=120, 
+    qb_list_id = models.CharField(
+        max_length=120, 
         blank=True, 
         null=True
-        )
-    _time_created = models.DateTimeField(blank=True, null=True)
-    _time_modified = models.DateTimeField(blank=True, null=True)
+    )
+    qb_time_created = models.DateTimeField(blank=True, null=True)
+    qb_time_modified = models.DateTimeField(blank=True, null=True)
 
     @staticmethod
     def get_query(*args, **kwargs): 
+        """
+        Returns QBXML the calling model should send to the web connector.
+        """
         raise NotImplementedError
         
     @staticmethod
     def post_query(*args, **kwargs): 
+        """
+        Returns QBXML the calling model should send to the web connector.
+        """
         raise NotImplementedError
 
     @staticmethod
     def patch_query(*args, **kwargs): 
+        """
+        Returns QBXML the calling model should send to the web connector.
+        """
         raise NotImplementedError
 
     @staticmethod
     def process_get(*args, **kwargs): 
+        """
+        Handler for how the calling model should process the QBXML response from the web connector in the application
+        """
         raise NotImplementedError
 
     @staticmethod
     def process_post(*args, **kwargs): 
+        """
+        Handler for how the calling model should process the QBXML response from the web connector in the application
+        """
         raise NotImplementedError
 
     @staticmethod
     def process_patch(*args, **kwargs): 
+        """
+        Handler for how the calling model should process the QBXML response from the web connector in the application
+        """
         raise NotImplementedError
     
     def batch_model(self, ticket, *args, **kwargs):
@@ -230,10 +271,28 @@ class BaseObjectMixin(models.Model):
         The inheriting model gets a batch_model() method that assigns the ticket number (batch_id)
         to the object. We can now batch all objects that have a ticket id and a 
         """
-        self._batch_id = ticket
+        self.batch_ticket = ticket
         self.save()
+
+    # Sets the default model manager 
+    objects = models.Manager()
+    process = BaseObjectManager()
+
 
     class Meta: 
         abstract = True
 
     
+class MessageLog(models.Model): 
+    ticket = models.ForeignKey(
+        TicketQueue,
+        related_name='logs',
+        on_delete=models.CASCADE
+        )
+    type = models.CharField(max_length=10)
+    hresult = models.CharField(max_length=60, null=True, blank=True)
+    message = models.TextField()
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): 
+        return self.message

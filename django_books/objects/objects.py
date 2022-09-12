@@ -145,7 +145,7 @@ def add_credit_card_payment(credit_card='CalOil Card',
     amount=102.12, 
     expense_description=''):
         
-    reqXML = """
+    reqXML = f"""
     <?qbxml version="15.0"?>
     <QBXML>
     <QBXMLMsgsRq onError="stopOnError">
@@ -175,16 +175,8 @@ def add_credit_card_payment(credit_card='CalOil Card',
     </CreditCardChargeAddRq>
     </QBXMLMsgsRq>
     </QBXML>
-    """.format(credit_card=credit_card, 
-        vendor=vendor,
-        date=date,
-        ref_number=ref_number,
-        memo=memo, 
-        expense_account=expense_account,
-        amount=amount,
-        expense_description=expense_description
-        )
-
+    """
+    
     return reqXML
 
 

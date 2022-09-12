@@ -1,5 +1,5 @@
-import logging
-import pandas as pd 
+from ast import Interactive
+import logging 
 
 from datetime import datetime 
 from lxml import etree
@@ -12,8 +12,8 @@ from spyne.model.complex import Array, Unicode
 from spyne.model.primitive import Integer, String
 from spyne.service import ServiceBase
 
-from django_books.objects import *
-from django_books.models import ServiceAccount, TicketQueue
+from django_books.objects import process_response, process_query_response
+from django_books.models import MessageLog, ServiceAccount, TicketManager, TicketQueue
 
 from django.conf import settings
 
@@ -23,15 +23,32 @@ class QBWC_CODES:
     """
     Response codes from webconnector
     """
-    NONE = 'none'  # no work to do for the service
-    BUSY = 'busy'  # service is busy with other task
-    NVU = 'nvu'  # invalid user is sent to the service
-    CC = ''  # indicates current company to use for the web connector to proceed further
-    CONN_CLS_OK = 'ok'  # indicates web connector and web service _set_connection closed successfully
-    CONN_CLS_ERR = 'done'  # indicates web connector failed connecting to web service and finished its job
-    INTR_DONE = 'done'  # indicates web connector finished interactive session with web service
-    UNEXP_ERR = 'unexpected error'  # unexpected error received from web connector
-    CV = ''  # no update needed for web connector to update its version, it can proceed further
+    # no work to do for the service
+    NONE = 'none'  
+    
+    # service is busy with other task
+    BUSY = 'busy'  
+    
+    # invalid user is sent to the service
+    INVALID_USER = 'nvu'  
+    
+    # indicates current company to use for the web connector to proceed further
+    CURRENT_COMPANY = ''  
+    
+    # indicates web connector and web service _set_connection closed successfully
+    CONN_CLOSE_OK = 'ok'  
+    
+    # indicates web connector failed connecting to web service and finished its job
+    CONN_CLOSE_ERROR = 'done'  
+    
+    # indicates web connector finished interactive session with web service
+    INTERACTIVE_COMPLETE = 'done'  
+    
+    # unexpected error received from web connector
+    UNEXPECTED_ERROR = 'unexpected error'  
+    
+    # no update needed for web connector to update its version, it can proceed further
+    CURRENT_VERSION = ''  
 
 
 class QuickBooksService(ServiceBase): 
@@ -59,53 +76,50 @@ class QuickBooksService(ServiceBase):
         """
         
         if ServiceAccount.objects.get(qbid=strUserName):
-            # Create a service account and make sure the username matches the UUID passed to the 
-            # <UserName> </UserName> field in the .qwc file installed to WebConnector.
             if ServiceAccount.objects.get(qbid=strUserName).password == strPassword:
                 logger.debug('Successfully logged in')
-                # If there is new work to be processed check for it here. 
-                if TicketQueue.process.get_tickets() > 0: 
-                # if TicketQueue.objects.filter(status='1').count() > 0: # Created
-                    # ticket = TicketQueue.objects.filter(status='1').first().ticket
+                
+                
+                if TicketQueue.process.count_queue() > 0: 
                     ticket = TicketQueue.process.get_next_ticket()
                     logger.debug('Processing Tickets...')
+                    return [ticket, QBWC_CODES.CURRENT_COMPANY]
 
-                    return [ticket, '']
                 else:
                     logger.debug('No tickets in queue...')
-                    
-                    return ['none', 'none']
-        return []
+                    return [QBWC_CODES.NONE, QBWC_CODES.NONE]
+        
+        logger.error('Invalid user')
+        return [QBWC_CODES.INVALID_USER, QBWC_CODES.INVALID_USER]
 
 
     @srpc(Unicode, Unicode, Unicode, Unicode, Integer, Integer, _returns=String) #Unicode, Unicode, Unicode,
     def sendRequestXML(ticket, strHCPResponse, strCompanyFileName, qbXMLCountry, qbXMLMajorVers, qbXMLMinorVers): 
+        
         logger.debug('sendRequestXML() has been called')
+        logger.debug('ticket: ' + ticket)
+        logger.debug('strCompanyFileName ' + str(strCompanyFileName))
         
-        # Before xml is sent to be processed, check it is being sent to the correct file 
-        # Weird error when logging these variable not converted to string?
-        # logger.debug('ticket:', ticket)
-        # logger.debug('strCompanyFileName', str(strCompanyFileName))
-        
-        t = TicketQueue.objects.get(ticket=ticket)
-        
-        model = t.get_model()
-
-        # breakpoint()
-    
-        if t.method == 'GET':
+        current_ticket = TicketQueue.objects.get(ticket=ticket)
+        message = MessageLog()
+        message.ticket = current_ticket 
+                
+        model = current_ticket.get_model()
+   
+        if current_ticket.method == 'GET':
             qbxml = model.get_query()
             logger.debug(qbxml)
 
-        elif t.method == 'POST': 
-            qbxml = model.post_query(t.ticket)
+        elif current_ticket.method == 'POST': 
+            qbxml = model.post_query(current_ticket.ticket)
             logger.debug(qbxml)
 
         else:
             qbxml = model.patch_query()
             
-        t.status = TicketQueue.TicketStatus.PROCESSING
-        t.save()
+        current_ticket.status = TicketQueue.TicketStatus.PROCESSING
+        current_ticket.save()
+        message.save()
 
         return qbxml
         
@@ -135,85 +149,68 @@ class QuickBooksService(ServiceBase):
                 
         try:
             # Process the response from QuickBooks - should this be model dependent?
-            resp_code = process_response(response).get('statusSeverity')
-            response = process_query_response(response)
+            response_code = process_response(response).get('statusSeverity')
+            qb_response = process_query_response(response)
 
         except Exception as e:
             logger.error(str(e))
-            resp = {}
-
-
-        t = TicketQueue.objects.get(ticket=ticket)
-        model = t.get_model()
+            response_error = {}
         
-        if t.method == t.TicketMethod.GET: 
+        current_ticket = TicketQueue.objects.get(ticket=ticket)
+        model = current_ticket.get_model()
+        
+        
+        if current_ticket.method == current_ticket.TicketMethod.GET: 
             try:
+                # Assumes GET method is a single round trip...
                 logger.debug('Processing GET query response')
-                model.process_get(ticket, response)
-                t.status = t.TicketStatus.SUCCESS
-                t.save()
+                model.process_get(qb_response, ticket)
+                current_ticket.status = current_ticket.TicketStatus.SUCCESS
+                current_ticket.save()
             
             except Exception as e:
                 logger.error(str(e))
-                t.status = t.TicketStatus.FAILED
-                t.save()
+                current_ticket.status = current_ticket.TicketStatus.FAILED
+                current_ticket.save()
 
-        elif t.method == t.TicketMethod.POST: 
+        elif current_ticket.method == current_ticket.TicketMethod.POST: 
             try:
                 logger.debug('Processing POST query response')
                 # Errors get handled in processing function and bubble to { getLastError() }
-                model.process_post(ticket, *response)
+                model.process_post(qb_response, ticket)
                 
-                # No error - check for additional work to be preformed
-                # ticket.model.objects.filter()
-                if model.objects.filter(
-                        _batch_id=t.ticket
-                        ).exclude(
-                            _batch_status=model.BatchStatus.BATCHED
-                            ).count() >= 1: 
-                    logger.debug('more work to do')
+                # breakpoint()
+                # model.objects.filter(batch_ticket=ticket).exclude(batch_status='BATCHED').count()
+                if model.process.check_for_work(ticket):
+                    logger.debug('More work to do')
                     return 90 
-
                 else: 
-                    # success
-                    logger.debug('complete work success')
-                    t.status = t.TicketStatus.SUCCESS
-                    t.save()
+                    logger.debug('Work completed')
+                    current_ticket.status = current_ticket.TicketStatus.SUCCESS
+                    current_ticket.save()
                     return 100 
 
             except Exception as e:
                 # Don't try to handle exception end the operation 
                 logger.error(str(e))
-                t.status = t.TicketStatus.ERROR
+                current_ticket.status = current_ticket.TicketStatus.ERROR
                 raise Exception 
                 # return 100 
         else: 
             try: 
-                logger.debug('Processing POST query response')
+                logger.debug('Processing PATCH query response')
 
             except Exception as e: 
                 logger.error(str(e))
                 raise Exception('Error in PATCH process response')
 
 
-        if resp_code == 'Error' or hresult is not None:
+        if response_code == 'Error' or hresult is not None:
+            # Errors should be logged and continued upon?
             pass
-            # error = Expense.objects.filter(status='APPROVED').first()
-            # error.status = 'CLOSED'
-            # error.save()
         else: 
             pass
-            # success = Expense.objects.filter(status='APPROVED').first()
-            # success.status = 'CLOSED'
-            # success.save()
-
-        # if the calling ticket has additional work to be completed... 
-        # if ticket_model.objects.filter(batch_id=str(ticket.ticket), status='CLOSED').count() > 0:
-        # # return session_manager.process_response(ticket, response, hresult, message)
-            return 90
         return 100
-
-
 
     @srpc(Unicode, _returns=Unicode)
     def serverVersion(strVersion, *args): 
@@ -223,7 +220,7 @@ class QuickBooksService(ServiceBase):
         @return string message string describing the server version and any other information that user may want to see
         """
         version=settings.QBWC_VERSION
-        logger.debug('getServerVersion(): version=%s' % version)
+        logger.debug(f'getServerVersion(): version={version}')
         return version
 
     
@@ -233,12 +230,13 @@ class QuickBooksService(ServiceBase):
         Check the current WebConnector version is compatiable with the application.
 
         Args:
-            strVersion (str): QBWC version?
+            strVersion (str): QBWC Version
         """
         if strVersion == settings.QBWC_VERSION:
             logger.debug('Matches current version')
-        logger.debug('clientVersion(): version=%s' % strVersion)
-        return ''
+        logger.debug(f'clientVersion(): version={strVersion}')
+        
+        return QBWC_CODES.CURRENT_VERSION
 
 
     @rpc(Unicode, _returns=Unicode)
@@ -246,15 +244,15 @@ class QuickBooksService(ServiceBase):
         """
         Close the current connection with QuickBooks Webconnector.
         This is where we can clean up any work 
-        realm = session_manager.get_realm(ticket)
-        session_manager.close_session(realm)
 
         Args:
             ctx (DjangoHttpMethodContext): spyne processed request wasdl
             ticket (str): ticket that is completed?
         """
-        logger.debug('closeConnection(): ticket=%s' % ticket)
-        return 'ok'
+        # breakpoint()
+        logger.debug(f'closeConnection(): ticket={ticket}')
+        # return QBWC_CODES.CONN_CLOSE_OK
+        return f'Completed Operation: {ticket}'
 
     
     @srpc(Unicode, Unicode, Unicode, _returns=Unicode)
@@ -268,10 +266,19 @@ class QuickBooksService(ServiceBase):
         @return string value "done" to indicate web service is finished or the full path of the different company for
         retrying _set_connection.
         """
-        logger.debug('connectionError(): ticket=%s, hresult=%s, message=%s' % (ticket, hresult, message))
-        # realm = session_manager.get_realm(ticket)
-        # session_manager.close_session(realm)
-        return 'done'
+        log = MessageLog(
+            type = 'error', 
+            hresult = hresult, 
+            message = str(logger.debug(f'connectionError(): ticket={ticket}, hresult={hresult}, message={message}'))
+        )
+        log.save()
+
+        logger.debug(f'connectionError(): ticket={ticket}, hresult={hresult}, message={message}')
+        
+        current_ticket = TicketQueue.objects.get(ticket=ticket)
+        current_ticket.status = TicketQueue.TicketStatus.ERROR
+
+        return QBWC_CODES.CONN_CLOSE_ERROR
 
     @srpc(Unicode, _returns=Unicode)
     def getLastError(ticket): 
@@ -283,8 +290,16 @@ class QuickBooksService(ServiceBase):
         The web connector writes this message to the web connector log for the user and also displays it in the web
         connector’s Status column.
         """
-        # \\TODO ticket needs method ticket.response.get_last_error() 
-        logger.debug('getLastError(): ticket=%s' % ticket)
+        # breakpoint()
+        log = MessageLog(
+            ticket=TicketQueue.objects.get(ticket=ticket),
+            type = 'error',
+            hresult = '',
+            message = f'getLastError(): ticket={ticket}'
+        )
+        
+        log.save()
+        logger.error(f'getLastError(): ticket={ticket}')
         return f'Error processing ticket: {ticket}'
 
 

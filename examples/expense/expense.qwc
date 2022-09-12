@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<QBWCXML>
+    <AppName>expense-books</AppName>
+    <AppID></AppID>
+    <AppURL>http://localhost:8000/webconnector/</AppURL>
+    <AppDescription>Django QuickBooks WebConnector</AppDescription>
+    <AppSupport>http://localhost:8000/support/</AppSupport>
+    <UserName>9ba18eaa-c3c8-4dee-a4cb-ed54b1977f46</UserName>
+    <OwnerID>{dced599a-b2e0-414d-8abb-a753b698938a}</OwnerID>
+    <FileID>{07e19c4c-edeb-4109-a63a-444d480c5f8c}</FileID>
+    <QBType>QBFS</QBType>
+    <Scheduler><RunEveryNMinutes>60</RunEveryNMinutes></Scheduler>
+</QBWCXML>
