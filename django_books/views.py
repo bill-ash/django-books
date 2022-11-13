@@ -13,7 +13,7 @@ from spyne.model.primitive import Integer, String
 from spyne.service import ServiceBase
 
 from django_books.objects import process_response, process_query_response
-from django_books.models import MessageLog, ServiceAccount, TicketManager, TicketQueue
+from django_books.models import ServiceAccount, TicketManager, TicketQueue # MessageLog,
 
 from django.conf import settings
 
@@ -101,8 +101,8 @@ class QuickBooksService(ServiceBase):
         logger.debug('strCompanyFileName ' + str(strCompanyFileName))
         
         current_ticket = TicketQueue.objects.get(ticket=ticket)
-        message = MessageLog()
-        message.ticket = current_ticket 
+        # message = MessageLog()
+        # message.ticket = current_ticket 
                 
         model = current_ticket.get_model()
    
@@ -119,7 +119,7 @@ class QuickBooksService(ServiceBase):
             
         current_ticket.status = TicketQueue.TicketStatus.PROCESSING
         current_ticket.save()
-        message.save()
+        # message.save()
 
         return qbxml
         
@@ -266,12 +266,12 @@ class QuickBooksService(ServiceBase):
         @return string value "done" to indicate web service is finished or the full path of the different company for
         retrying _set_connection.
         """
-        log = MessageLog(
-            type = 'error', 
-            hresult = hresult, 
-            message = str(logger.debug(f'connectionError(): ticket={ticket}, hresult={hresult}, message={message}'))
-        )
-        log.save()
+        # log = MessageLog(
+        #     type = 'error', 
+        #     hresult = hresult, 
+        #     message = str(logger.debug(f'connectionError(): ticket={ticket}, hresult={hresult}, message={message}'))
+        # )
+        # log.save()
 
         logger.debug(f'connectionError(): ticket={ticket}, hresult={hresult}, message={message}')
         
@@ -291,14 +291,14 @@ class QuickBooksService(ServiceBase):
         connector’s Status column.
         """
         # breakpoint()
-        log = MessageLog(
-            ticket=TicketQueue.objects.get(ticket=ticket),
-            type = 'error',
-            hresult = '',
-            message = f'getLastError(): ticket={ticket}'
-        )
+        # log = MessageLog(
+        #     ticket=TicketQueue.objects.get(ticket=ticket),
+        #     type = 'error',
+        #     hresult = '',
+        #     message = f'getLastError(): ticket={ticket}'
+        # )
+        # log.save()
         
-        log.save()
         logger.error(f'getLastError(): ticket={ticket}')
         return f'Error processing ticket: {ticket}'
 

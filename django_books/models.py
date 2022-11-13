@@ -126,7 +126,7 @@ class TicketQueue(models.Model):
     # More research: 
     # https://github.com/CiCiUi/django-db-logger
     # Requirement: log all requests & responses with QB 
-    message_log = models.TextField(blank=True,null=True)
+    # message_log = models.TextField(blank=True,null=True)
 
     # pg column character limit 
     model = models.CharField(max_length=63) 
@@ -158,17 +158,17 @@ class TicketQueue(models.Model):
         model = ct.model_class()
         return model 
 
-    def get_logs(self, *args, **kwargs):
+    # def get_logs(self, *args, **kwargs):
         
-        message_log = self.logs.all()
+    #     message_log = self.logs.all()
         
-        if message_log:
-            self.message_log = '\n'.join([c.message for c in message_log])
-        else: 
-            self.message_log = ''
+    #     if message_log:
+    #         self.message_log = '\n'.join([c.message for c in message_log])
+    #     else: 
+    #         self.message_log = ''
 
     def save(self, *args, **kwargs): 
-        self.get_logs()
+        # self.get_logs()
         super(TicketQueue, self).save(*args, **kwargs)
 
     def __str__(self): 
@@ -283,16 +283,16 @@ class BaseObjectMixin(models.Model):
         abstract = True
 
     
-class MessageLog(models.Model): 
-    ticket = models.ForeignKey(
-        TicketQueue,
-        related_name='logs',
-        on_delete=models.CASCADE
-        )
-    type = models.CharField(max_length=10)
-    hresult = models.CharField(max_length=60, null=True, blank=True)
-    message = models.TextField()
-    created_on = models.DateTimeField(auto_now_add=True)
+# class MessageLog(models.Model): 
+#     ticket = models.ForeignKey(
+#         TicketQueue,
+#         related_name='logs',
+#         on_delete=models.CASCADE
+#         )
+#     type = models.CharField(max_length=10)
+#     hresult = models.CharField(max_length=60, null=True, blank=True)
+#     message = models.TextField()
+#     created_on = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self): 
-        return self.message
+#     def __str__(self): 
+#         return self.message
