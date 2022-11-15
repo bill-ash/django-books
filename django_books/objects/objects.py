@@ -79,6 +79,19 @@ def query_customer():
     return reqXML
 
 
+def query_other_name_list():
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <OtherNameQueryRq requestID="1">
+                </OtherNameQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+
 def query_vendor():
     reqXML = """
         <?qbxml version="15.0"?>
@@ -90,7 +103,7 @@ def query_vendor():
         </QBXML>
     """
     return reqXML
-
+ 
 
 def query_journal():
     # failed
@@ -104,6 +117,7 @@ def query_journal():
         </QBXML>
     """
     return reqXML
+
 
 
 def query_bill():

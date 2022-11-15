@@ -189,9 +189,9 @@ class QuickBooksService(ServiceBase):
             try:
                 logger.debug("Processing POST query response")
                 # Errors get handled in processing function and bubble to { getLastError() }
+                
                 model.process_post(qb_response, ticket)
 
-                # breakpoint()
                 # model.objects.filter(batch_ticket=ticket).exclude(batch_status='BATCHED').count()
                 if model.process.check_for_work(ticket):
                     logger.debug("More work to do")

@@ -50,8 +50,7 @@ class ServiceAccount(models.Model):
         username=uuid4(),
         sync_time=60,
     ):
-        return f"""
-            <?xml version='1.0' encoding='UTF-8'?>
+        return f"""<?xml version='1.0' encoding='UTF-8'?>
             <QBWCXML>
                 <AppName>{app_name}</AppName>
                 <AppID></AppID>
@@ -205,7 +204,9 @@ class BaseObjectMixin(models.Model):
     batch_ticket = models.CharField(max_length=124, blank=True, null=True)
 
     batch_status = models.CharField(
-        max_length=30, choices=BatchStatus.choices, default=BatchStatus.UN_BATCHED
+        max_length=30, 
+        choices=BatchStatus.choices, 
+        default=BatchStatus.UN_BATCHED
     )
 
     # QuickBooks Fields
