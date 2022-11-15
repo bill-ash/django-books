@@ -5,8 +5,9 @@ admin.site.register(ServiceAccount)
 
 
 class TicketQueueAdmin(admin.ModelAdmin):
-    list_display = ('ticket', 'status', 'method', 'model', 'last_update')
-    list_display_links = ('ticket',)
-    ordering = ['-last_update']
+    list_display = ("ticket", "status", "method", "model", "last_update")
+    list_display_links = ("ticket",)
+    ordering = ["-last_update"]
+
 
 admin.site.register(TicketQueue, TicketQueueAdmin)

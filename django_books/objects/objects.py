@@ -1,13 +1,14 @@
-# These are methods that should be implemented on the client side 
-# App user wants to implement a customer: 
-# - get_query() -> returns qbxml to query customers 
+# These are methods that should be implemented on the client side
+# App user wants to implement a customer:
+# - get_query() -> returns qbxml to query customers
 # - post_query() -> returns qbxml to create a new customer in QB
-# - patch_query() -> returns qbxml to update a customer in QB 
+# - patch_query() -> returns qbxml to update a customer in QB
 
 from datetime import datetime
 from lxml import etree
 
-def query(model): 
+
+def query(model):
     reqXML = """
         <?qbxml version="15.0"?>
             <QBXML>
@@ -16,10 +17,14 @@ def query(model):
                 </%sQueryRq>
             </QBXMLMsgsRq>
         </QBXML>
-    """ % (model, model)
+    """ % (
+        model,
+        model,
+    )
     return reqXML
 
-def query_account(): 
+
+def query_account():
     reqXML = """
         <?qbxml version="15.0"?>
             <QBXML>
@@ -32,7 +37,36 @@ def query_account():
     """
     return reqXML
 
-def query_customer(): 
+
+def query_expense_account():
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <AccountQueryRq requestID="1">
+                    <AccountType>Expense</AccountType>
+                </AccountQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+
+def query_credit_card_account():
+    reqXML = """
+        <?qbxml version="15.0"?>
+            <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <AccountQueryRq requestID="1">
+                    <AccountType>CreditCard</AccountType>
+                </AccountQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+    return reqXML
+
+
+def query_customer():
     reqXML = """
         <?qbxml version="15.0"?>
             <QBXML>
@@ -44,7 +78,8 @@ def query_customer():
     """
     return reqXML
 
-def query_vendor(): 
+
+def query_vendor():
     reqXML = """
         <?qbxml version="15.0"?>
             <QBXML>
@@ -56,7 +91,8 @@ def query_vendor():
     """
     return reqXML
 
-def query_journal(): 
+
+def query_journal():
     # failed
     reqXML = """
         <?qbxml version="15.0"?>
@@ -69,7 +105,8 @@ def query_journal():
     """
     return reqXML
 
-def query_bill(): 
+
+def query_bill():
     reqXML = """
         <?qbxml version="15.0"?>
             <QBXML>
@@ -81,9 +118,10 @@ def query_bill():
     """
     return reqXML
 
-def query_custom_txn(): 
+
+def query_custom_txn():
     # https://github.com/IntuitDeveloper/QBXML_SDK_Samples/blob/64bitUpgrade/xmlfiles/legacy/CustomDetailReport.xml
-    # does not get parsed all the way 
+    # does not get parsed all the way
     reqXML = """
        <?qbxml version="2.0"?>
         <QBXML>
@@ -106,7 +144,7 @@ def query_custom_txn():
     return reqXML
 
 
-def query_class(): 
+def query_class():
     reqXML = """
         <?qbxml version="15.0"?>
             <QBXML>
@@ -119,10 +157,10 @@ def query_class():
     return reqXML
 
 
-def add_customer(name='bill'):
+def add_customer(name="bill"):
     if name is None:
-        raise ValueError('Name is a required field')
-    name = name + datetime.now().strftime('%H%s')
+        raise ValueError("Name is a required field")
+    name = name + datetime.now().strftime("%H%s")
     reqXML = """
         <?qbxml version="15.0"?>
         <QBXML>
@@ -132,19 +170,23 @@ def add_customer(name='bill'):
                 </CustomerAddRq> 
             </QBXMLMsgsRq>
         </QBXML>
-        """.format(name)
+        """.format(
+        name
+    )
     return reqXML
 
 
-def add_credit_card_payment(credit_card='CalOil Card',
-    vendor='ODI',
-    date='2022-01-01',
-    ref_number='3123',
-    memo='MEMO',
-    expense_account='', 
-    amount=102.12, 
-    expense_description=''):
-        
+def add_credit_card_payment(
+    credit_card="CalOil Card",
+    vendor="ODI",
+    date="2022-01-01",
+    ref_number="3123",
+    memo="MEMO",
+    expense_account="",
+    amount=102.12,
+    expense_description="",
+):
+
     reqXML = f"""
     <?qbxml version="15.0"?>
     <QBXML>
@@ -176,29 +218,28 @@ def add_credit_card_payment(credit_card='CalOil Card',
     </QBXMLMsgsRq>
     </QBXML>
     """
-    
+
     return reqXML
 
 
-
 def process_response(response):
-        
+
     qbxml_root = etree.fromstring(response)
 
-    assert qbxml_root.tag == 'QBXML'
+    assert qbxml_root.tag == "QBXML"
 
     qbxml_msg_rs = qbxml_root[0]
-    
-    assert qbxml_msg_rs.tag == 'QBXMLMsgsRs'
+
+    assert qbxml_msg_rs.tag == "QBXMLMsgsRs"
 
     response_body_root = qbxml_msg_rs[0]
 
-    assert 'statusCode' in response_body_root.attrib  
+    assert "statusCode" in response_body_root.attrib
 
     return response_body_root
 
-    
-def process_query_response(response): 
+
+def process_query_response(response):
 
     response_body_root = process_response(response)
 
@@ -207,9 +248,7 @@ def process_query_response(response):
         children = response_body_root[x].getchildren()
         tmp = {}
         for child in children:
-            tmp[child.tag] = child.text 
+            tmp[child.tag] = child.text
         resp.append(tmp)
 
-    return resp 
-
-    
+    return resp

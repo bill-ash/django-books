@@ -1,1 +1,1 @@
-QBWC_VERSION = ''
+QBWC_VERSION = ""
