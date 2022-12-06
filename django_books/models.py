@@ -168,7 +168,7 @@ class TicketQueue(models.Model):
         super(TicketQueue, self).save(*args, **kwargs)
 
     def __str__(self):
-        return self.model
+        return str(self.ticket)
 
 
 class BaseObjectManager(models.Manager):
@@ -177,6 +177,7 @@ class BaseObjectManager(models.Manager):
         Checks the calling model for status unbatched with current ticket id. Ensures that all transactions
         assigned a ticket in batching have been executed.
         """
+        print('BASE OBJECT MANAGER')
         count = self.filter(batch_ticket=ticket, batch_status="UN_BATCHED").count()
         return count > 0
 
@@ -201,7 +202,8 @@ class BaseObjectMixin(models.Model):
         BATCHED = ("BATCHED", "BATCHED")
         UN_BATCHED = ("UN_BATCHED", "UN_BATCHED")
 
-    batch_ticket = models.CharField(max_length=124, blank=True, null=True)
+    # batch_ticket = models.CharField(max_length=124, blank=True, null=True)
+    batch_ticket = models.ForeignKey(TicketQueue, blank=True, null=True, on_delete=models.CASCADE)
 
     batch_status = models.CharField(
         max_length=30, 

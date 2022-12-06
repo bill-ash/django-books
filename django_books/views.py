@@ -114,25 +114,27 @@ class QuickBooksService(ServiceBase):
         logger.debug("strCompanyFileName " + str(strCompanyFileName))
 
         current_ticket = TicketQueue.objects.get(ticket=ticket)
-        # message = MessageLog()
-        # message.ticket = current_ticket
-
+        
         model = current_ticket.get_model()
 
-        if current_ticket.method == "GET":
-            qbxml = model.get_query()
-            logger.debug(qbxml)
+        try:
+            if current_ticket.method == "GET":
+                qbxml = model.get_query()
+                logger.debug(qbxml)
 
-        elif current_ticket.method == "POST":
-            qbxml = model.post_query(current_ticket.ticket)
-            logger.debug(qbxml)
+            elif current_ticket.method == "POST":
+                # qbxml = model.post_query(current_ticket.ticket)
+                qbxml = model.post_query(current_ticket)
+                logger.debug(qbxml)
 
-        else:
-            qbxml = model.patch_query()
+            else:
+                qbxml = model.patch_query()
+        except Exception as e: 
+            logger.error(e)
+            breakpoint()
 
         current_ticket.status = TicketQueue.TicketStatus.PROCESSING
         current_ticket.save()
-        # message.save()
 
         return qbxml
 
@@ -153,7 +155,7 @@ class QuickBooksService(ServiceBase):
 
         logger.debug("receiveResponseXML()")
         logger.debug("ticket=" + ticket)
-        logger.debug("response=" + response)
+        # logger.debug("response=" + response)
 
         # Check to see if there is an error message
         if hresult:
@@ -162,10 +164,11 @@ class QuickBooksService(ServiceBase):
 
         try:
             # Process the response from QuickBooks - should this be model dependent?
-            response_code = process_response(response).get("statusSeverity")
+            # response_code = process_response(response).get("statusSeverity")
             qb_response = process_query_response(response)
 
         except Exception as e:
+            breakpoint()
             logger.error(str(e))
             response_error = {}
 
@@ -176,12 +179,14 @@ class QuickBooksService(ServiceBase):
             try:
                 # Assumes GET method is a single round trip...
                 logger.debug("Processing GET query response")
+                
                 model.process_get(qb_response, ticket)
                 current_ticket.status = current_ticket.TicketStatus.SUCCESS
                 current_ticket.save()
 
             except Exception as e:
                 logger.error(str(e))
+                breakpoint()
                 current_ticket.status = current_ticket.TicketStatus.FAILED
                 current_ticket.save()
 
@@ -189,13 +194,16 @@ class QuickBooksService(ServiceBase):
             try:
                 logger.debug("Processing POST query response")
                 # Errors get handled in processing function and bubble to { getLastError() }
-                
-                model.process_post(qb_response, ticket)
 
-                # model.objects.filter(batch_ticket=ticket).exclude(batch_status='BATCHED').count()
-                if model.process.check_for_work(ticket):
+                model.process_post(qb_response, ticket)
+                
+                # Move this method to the ticket... 
+                # current_ticket.objects.filter(ticket__batch_status )
+                if model.process.check_for_work(current_ticket):
+                # if model.process.check_for_work(ticket):
                     logger.debug("More work to do")
                     return 90
+
                 else:
                     logger.debug("Work completed")
                     current_ticket.status = current_ticket.TicketStatus.SUCCESS
@@ -205,7 +213,10 @@ class QuickBooksService(ServiceBase):
             except Exception as e:
                 # Don't try to handle exception end the operation
                 logger.error(str(e))
+                breakpoint()
+
                 current_ticket.status = current_ticket.TicketStatus.ERROR
+                current_ticket.save()
                 raise Exception
                 # return 100
         else:
@@ -216,7 +227,7 @@ class QuickBooksService(ServiceBase):
                 logger.error(str(e))
                 raise Exception("Error in PATCH process response")
 
-        if response_code == "Error" or hresult is not None:
+        if hresult is not None: # response_code == "Error" or
             # Errors should be logged and continued upon?
             pass
         else:

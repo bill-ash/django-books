@@ -38,6 +38,8 @@ def query_account():
     return reqXML
 
 
+
+
 def query_expense_account():
     reqXML = """
         <?qbxml version="15.0"?>
@@ -102,6 +104,21 @@ def query_vendor():
             </QBXMLMsgsRq>
         </QBXML>
     """
+    return reqXML
+
+def query_full_vendor():
+    reqXML = """
+        <?qbxml version="15.0"?>
+        <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <VendorQueryRq>
+                </VendorQueryRq>
+                <OtherNameQueryRq>
+                </OtherNameQueryRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+    """
+
     return reqXML
  
 
@@ -235,20 +252,89 @@ def add_credit_card_payment(
 
     return reqXML
 
+def add_credit_card_refund(
+    credit_card="CalOil Card",
+    vendor="ODI",
+    date="2022-01-01",
+    ref_number="3123",
+    memo="MEMO",
+    expense_account="",
+    amount=102.12,
+    expense_description="",
+    ):
+
+    reqXML = f"""
+    <?qbxml version="15.0"?>
+        <QBXML>
+            <QBXMLMsgsRq onError="stopOnError">
+                <CreditCardCreditAddRq>
+                <CreditCardCreditAdd > 
+                    <AccountRef>                                         
+                        <FullName>{credit_card}</FullName>
+                    </AccountRef>
+                    <PayeeEntityRef>
+                        <FullName >{vendor}</FullName>
+                    </PayeeEntityRef>
+                    <TxnDate >{date}</TxnDate> 
+                    <RefNumber >{ref_number}</RefNumber>
+                    <Memo >{memo}</Memo>                     
+                    <ExpenseLineAdd> 
+                        <AccountRef> 
+                            <FullName >{expense_account}</FullName>
+                        </AccountRef>
+                        <Amount >{abs(amount)}</Amount> 
+                        <Memo >{expense_description}</Memo> 
+                    </ExpenseLineAdd>  
+                </CreditCardCreditAdd>
+                </CreditCardCreditAddRq>
+            </QBXMLMsgsRq>
+        </QBXML>
+        """
+
+    return reqXML
+
+
+def add_other_name(
+    name,
+    company_name='',
+    account_number=''
+    ): 
+    """Add new names to the vendor list before syncing new expenses"""
+    reqXML = f"""
+    <?qbxml version="15.0"?>
+    <QBXML>
+        <QBXMLMsgsRq onError="stopOnError">
+            <OtherNameAddRq>
+                <OtherNameAdd> 
+                    <Name >{name}</Name> 
+                    <CompanyName >{company_name}</CompanyName> 
+                    <AccountNumber >{account_number}</AccountNumber> 
+                </OtherNameAdd>
+            </OtherNameAddRq>   
+        </QBXMLMsgsRq>
+    </QBXML>
+    """
+
+    return reqXML
+
 
 def process_response(response):
 
     qbxml_root = etree.fromstring(response)
 
     assert qbxml_root.tag == "QBXML"
-
+    
     qbxml_msg_rs = qbxml_root[0]
 
     assert qbxml_msg_rs.tag == "QBXMLMsgsRs"
+    
+    # response_body_root = qbxml_msg_rs[0]
+    # We can process more than one query at once! 
+    response_body_root = [c for c in qbxml_msg_rs]
 
-    response_body_root = qbxml_msg_rs[0]
-
-    assert "statusCode" in response_body_root.attrib
+    # assert "statusCode" in response_body_root.attrib
+    for attrib in response_body_root: 
+        assert "statusCode" in attrib.attrib
 
     return response_body_root
 
@@ -256,13 +342,19 @@ def process_response(response):
 def process_query_response(response):
 
     response_body_root = process_response(response)
+    
+    def q_response(ctx):
+        resp = []
+        for x in range(len(ctx)):
+            children = ctx[x].getchildren()
+            tmp = {}
+            for child in children: 
+                tmp[child.tag] = child.text
+            resp.append(tmp)
+        return resp 
+    
+    response = [q_response(c) for c in response_body_root]
+    
+    response = [x for y in response for x in y]
 
-    resp = []
-    for x in range(len(response_body_root)):
-        children = response_body_root[x].getchildren()
-        tmp = {}
-        for child in children:
-            tmp[child.tag] = child.text
-        resp.append(tmp)
-
-    return resp
+    return response 
