@@ -1,5 +1,12 @@
 # Django Books
 
+View gunicorn logs 
+
+```
+sudo journalctl --unit=abl | tail -n500
+```
+
+
 Functional django application for interacting with the QuickBooks Desktop Webconnector.
 
 Find example applications in `/examples/`.
