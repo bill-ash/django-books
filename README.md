@@ -1,13 +1,6 @@
 # Django Books
 
-View gunicorn logs 
-
-```
-sudo journalctl --unit=abl | tail -n500
-```
-
-
-Functional django application for interacting with the QuickBooks Desktop Webconnector.
+Functional django application for interacting with the QuickBooks Desktop Webconnector (QBWC).
 
 Find example applications in `/examples/`.
 
@@ -32,11 +25,11 @@ Two sample apps are included for adding new customers and jobs as well as creati
 
 ## TODOS
 
-Create a service account which is responsible for communicating with the Webconnector. 
-- Add a method that produces a .qwc file that is installed to webconnector
+Create a service account which is responsible for communicating with the QBWC. 
+- Add a method that produces a `.qwc` file that is installed to QBWC
 - Like an admin? Maybe a profile page for an admin that will spit out a .qwc file?
 
-Abstracting models is dificult. Each application will have it's own unique workflows that depend 
+Abstracting models is difficult. Each application will have it's own unique workflows that depend 
 on business requirements. 
 
 Create a model mixin that will add new 'batches' to be added to a ticket queue. The ticket 
@@ -66,7 +59,7 @@ web connector.
 - https://static.developer.intuit.com/qbSDK-current/doc/pdf/QBWC_proguide.pdf
 
 
-Additionaly, the forums are somewhat active: 
+Additionally, the forums are somewhat active: 
 
 - https://help.developer.intuit.com/s/
 
@@ -79,4 +72,5 @@ A single application will work on many QB files.
 
 
 Usernames (service accounts) are associated with specific files (a list of files). Test the authing 
-username 
+
+

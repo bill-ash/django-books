@@ -38,8 +38,6 @@ def query_account():
     return reqXML
 
 
-
-
 def query_expense_account():
     reqXML = """
         <?qbxml version="15.0"?>
@@ -106,6 +104,7 @@ def query_vendor():
     """
     return reqXML
 
+
 def query_full_vendor():
     reqXML = """
         <?qbxml version="15.0"?>
@@ -120,7 +119,7 @@ def query_full_vendor():
     """
 
     return reqXML
- 
+
 
 def query_journal():
     # failed
@@ -134,7 +133,6 @@ def query_journal():
         </QBXML>
     """
     return reqXML
-
 
 
 def query_bill():
@@ -217,7 +215,6 @@ def add_credit_card_payment(
     amount=102.12,
     expense_description="",
 ):
-
     reqXML = f"""
     <?qbxml version="15.0"?>
     <QBXML>
@@ -252,6 +249,7 @@ def add_credit_card_payment(
 
     return reqXML
 
+
 def add_credit_card_refund(
     credit_card="CalOil Card",
     vendor="ODI",
@@ -261,8 +259,7 @@ def add_credit_card_refund(
     expense_account="",
     amount=102.12,
     expense_description="",
-    ):
-
+):
     reqXML = f"""
     <?qbxml version="15.0"?>
         <QBXML>
@@ -294,11 +291,7 @@ def add_credit_card_refund(
     return reqXML
 
 
-def add_other_name(
-    name,
-    company_name='',
-    account_number=''
-    ): 
+def add_other_name(name, company_name="", account_number=""):
     """Add new names to the vendor list before syncing new expenses"""
     reqXML = f"""
     <?qbxml version="15.0"?>
@@ -319,42 +312,40 @@ def add_other_name(
 
 
 def process_response(response):
-
     qbxml_root = etree.fromstring(response)
 
     assert qbxml_root.tag == "QBXML"
-    
+
     qbxml_msg_rs = qbxml_root[0]
 
     assert qbxml_msg_rs.tag == "QBXMLMsgsRs"
-    
+
     # response_body_root = qbxml_msg_rs[0]
-    # We can process more than one query at once! 
+    # We can process more than one query at once!
     response_body_root = [c for c in qbxml_msg_rs]
 
     # assert "statusCode" in response_body_root.attrib
-    for attrib in response_body_root: 
+    for attrib in response_body_root:
         assert "statusCode" in attrib.attrib
 
     return response_body_root
 
 
 def process_query_response(response):
-
     response_body_root = process_response(response)
-    
+
     def q_response(ctx):
         resp = []
         for x in range(len(ctx)):
             children = ctx[x].getchildren()
             tmp = {}
-            for child in children: 
+            for child in children:
                 tmp[child.tag] = child.text
             resp.append(tmp)
-        return resp 
-    
+        return resp
+
     response = [q_response(c) for c in response_body_root]
-    
+
     response = [x for y in response for x in y]
 
-    return response 
+    return response

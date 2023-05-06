@@ -113,7 +113,7 @@ class QuickBooksService(ServiceBase):
         logger.debug("strCompanyFileName " + str(strCompanyFileName))
 
         current_ticket = TicketQueue.objects.get(ticket=ticket)
-        
+
         model = current_ticket.get_model()
 
         try:
@@ -128,13 +128,12 @@ class QuickBooksService(ServiceBase):
 
             else:
                 qbxml = model.patch_query()
-        except Exception as e: 
+        except Exception as e:
             logger.error(e)
             current_ticket.status = TicketQueue.TicketStatus.FAILED
             current_ticket.save()
 
-            raise KeyError('Error processing request')
-            
+            raise KeyError("Error processing request")
 
         current_ticket.status = TicketQueue.TicketStatus.PROCESSING
         current_ticket.save()
@@ -158,16 +157,15 @@ class QuickBooksService(ServiceBase):
 
         logger.debug("receiveResponseXML()")
         logger.debug("ticket=" + ticket)
-        
+
         # Check to see if there is an error message
         if hresult:
             logger.error("hresult=" + hresult)
             logger.error("message=" + message)
 
-        
         current_ticket = TicketQueue.objects.get(ticket=ticket)
         model = current_ticket.get_model()
-        
+
         try:
             # Process the response from QuickBooks - should this be model dependent?
             # response_code = process_response(response).get("statusSeverity")
@@ -177,14 +175,13 @@ class QuickBooksService(ServiceBase):
             logger.error(str(e))
             current_ticket.status = TicketQueue.TicketStatus.FAILED
             current_ticket.save()
-            raise KeyError('Error processing response from QB')
-
+            raise KeyError("Error processing response from QB")
 
         if current_ticket.method == current_ticket.TicketMethod.GET:
             try:
                 # Assumes GET method is a single round trip...
                 logger.debug("Processing GET query response")
-                
+
                 model.process_get(qb_response, ticket)
                 current_ticket.status = current_ticket.TicketStatus.SUCCESS
                 current_ticket.save()
@@ -193,20 +190,19 @@ class QuickBooksService(ServiceBase):
                 logger.error(str(e))
                 current_ticket.status = current_ticket.TicketStatus.FAILED
                 current_ticket.save()
-                raise KeyError(f'Error processing GET: {current_ticket.ticket}')
+                raise KeyError(f"Error processing GET: {current_ticket.ticket}")
 
         elif current_ticket.method == current_ticket.TicketMethod.POST:
-            
             try:
                 logger.debug("Processing POST query response")
                 # Errors get handled in processing function and bubble to { getLastError() }
 
                 model.process_post(qb_response, ticket)
-                
-                # Move this method to the ticket... 
+
+                # Move this method to the ticket...
                 # current_ticket.objects.filter(ticket__batch_status )
                 if model.process.check_for_work(current_ticket):
-                # if model.process.check_for_work(ticket):
+                    # if model.process.check_for_work(ticket):
                     logger.debug("More work to do")
                     return 90
 
@@ -222,7 +218,7 @@ class QuickBooksService(ServiceBase):
                 # breakpoint()
                 current_ticket.status = current_ticket.TicketStatus.ERROR
                 current_ticket.save()
-                raise KeyError(f'Error processing POST: {current_ticket.ticket}')
+                raise KeyError(f"Error processing POST: {current_ticket.ticket}")
                 # return 100
         else:
             try:
@@ -232,14 +228,16 @@ class QuickBooksService(ServiceBase):
                 logger.error(str(e))
                 current_ticket.status = current_ticket.TicketStatus.ERROR
                 current_ticket.save()
-                raise KeyError(f'Error processing patch request: {current_ticket.ticket}')
+                raise KeyError(
+                    f"Error processing patch request: {current_ticket.ticket}"
+                )
 
-        if hresult is not None: # response_code == "Error" or
+        if hresult is not None:  # response_code == "Error" or
             # Errors should be logged and continued upon?
             pass
         else:
             pass
-        
+
         return 100
 
     @srpc(Unicode, _returns=Unicode)

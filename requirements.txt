@@ -1,7 +1,6 @@
-asgiref==3.5.2
-# backports.zoneinfo==0.2.1
-Django==4.0.4
-lxml>=4.8.0
-pytz
+asgiref==3.6.0
+Django==4.2.1
+pyscopg2==66.0.2
+pytz==2023.3
 spyne==2.14.0
-sqlparse==0.4.2
+sqlparse==0.4.4

@@ -177,7 +177,7 @@ class BaseObjectManager(models.Manager):
         Checks the calling model for status unbatched with current ticket id. Ensures that all transactions
         assigned a ticket in batching have been executed.
         """
-        print('BASE OBJECT MANAGER')
+        print("BASE OBJECT MANAGER")
         count = self.filter(batch_ticket=ticket, batch_status="UN_BATCHED").count()
         return count > 0
 
@@ -203,12 +203,12 @@ class BaseObjectMixin(models.Model):
         UN_BATCHED = ("UN_BATCHED", "UN_BATCHED")
 
     # batch_ticket = models.CharField(max_length=124, blank=True, null=True)
-    batch_ticket = models.ForeignKey(TicketQueue, blank=True, null=True, on_delete=models.CASCADE)
+    batch_ticket = models.ForeignKey(
+        TicketQueue, blank=True, null=True, on_delete=models.CASCADE
+    )
 
     batch_status = models.CharField(
-        max_length=30, 
-        choices=BatchStatus.choices, 
-        default=BatchStatus.UN_BATCHED
+        max_length=30, choices=BatchStatus.choices, default=BatchStatus.UN_BATCHED
     )
 
     # QuickBooks Fields
